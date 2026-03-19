@@ -56,4 +56,4 @@ issues/
 
 | 日期 | 问题 | 标签 |
 |------|------|------|
-| — | 暂无记录 | — |
+| 2026-03-19 | [Session Tokens (cached) 含义解释](issues/other/2026-03-19-session-tokens-context-解释.md) | `knowledge` `context` `tokens` `session` |
