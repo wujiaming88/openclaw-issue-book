@@ -57,3 +57,4 @@ issues/
 | 日期 | 问题 | 标签 |
 |------|------|------|
 | 2026-03-19 | [Session Tokens (cached) 含义解释](issues/other/2026-03-19-session-tokens-context-解释.md) | `knowledge` `context` `tokens` `session` |
+| 2026-03-23 | [飞书 /new 命令无反应](issues/channel/2026-03-23-feishu-slash-command-no-response.md) | `channel` `feishu` `slash-command` `authorization` `allowFrom` |
