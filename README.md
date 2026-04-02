@@ -60,3 +60,4 @@ issues/
 | 2026-03-23 | [飞书 /new 命令无反应](issues/channel/2026-03-23-feishu-slash-command-no-response.md) | `channel` `feishu` `slash-command` `authorization` `allowFrom` |
 | 2026-03-25 | [trusted-proxy 模式导致 CLI 命令握手超时](issues/gateway/2026-03-25-trusted-proxy-cli-handshake-timeout.md) | `gateway` `auth` `trusted-proxy` `cli` `handshake-timeout` `websocket` |
 | 2026-03-26 | [doctor needsToken 逻辑误判 trusted-proxy 模式](issues/cli/2026-03-26-doctor-needsToken-trusted-proxy-误判.md) | `cli` `doctor` `auth` `trusted-proxy` `needsToken` `已修复` |
+| 2026-04-02 | [TUI 连接 Gateway 报错 token mismatch](issues/cli/2026-04-02-tui-gateway-token-mismatch.md) | `cli` `tui` `gateway` `token` `auth` `已解决` |
