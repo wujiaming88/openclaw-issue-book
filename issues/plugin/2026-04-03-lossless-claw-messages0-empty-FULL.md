@@ -2,10 +2,11 @@
 
 **事件 ID**: 2026-04-02 ~ 2026-04-03  
 **影响**: 所有使用 lossless-claw 的 agent（doubao, arkclaw 等）无法响应  
-**状态**: ✅ 已修复（PR #248）  
+**状态**: ✅ 主问题已修复（PR #248）| ❌ 次问题未修复（OpenClaw core `.replace()` bug）  
 **总耗时**: ~32 小时  
 **关键发现数**: 7 个  
-**误判数**: 7 个（有教训价值）
+**误判数**: 7 个（有教训价值）  
+**独立 Bug**: `.replace()` undefined — OpenClaw v2026.4.1 core failover 处理缺陷
 
 ---
 
@@ -339,6 +340,98 @@ const cleaned = ...
 
 ---
 
-**记录时间**: 2026-04-03 05:30 UTC  
+---
+
+## Phase 5: 后续发现与清理（Apr 3 05:37 ~ 06:34 UTC）
+
+### 独立 Bug：`.replace()` undefined（OpenClaw Core）
+
+**错误**: `Cannot read properties of undefined (reading 'replace')`  
+**位置**: `pi-embedded-bukGSgEe.js:37337` (OpenClaw v2026.4.1 core)  
+**触发条件**: Model failover 超时链（opus-4-6 → sonnet-4-6 → opus-4-5 → haiku）
+
+**代码上下文** (line 37335):
+```javascript
+const message = (lastAssistant ? formatAssistantErrorText(lastAssistant, {
+    cfg: params.config,
+    sessionKey: params.sessionKey ?? params.sessionId,
+    provider: activeErrorContext.provider,
+    model: activeErrorContext.model
+}) : void 0) || lastAssistant?.errorMessage?.trim() || (timedOut ? "LLM request timed out." : ...);
+```
+
+**根因**: failover 错误处理中，某个消息对象属性为 undefined 时直接调用了 `.replace()`，缺少 null check。
+
+**影响**:
+- 仅 wairesearch agent 受影响（05:34~05:37 UTC 连续 3 次 failover）
+- 每次 crash 向 DB 写入一条 content="" 的 assistant 消息
+- main/clawdoctor 不受影响（failover 到 haiku 成功）
+
+**为什么 failover**: wairesearch conversation 有 1,888 条消息（~1.3M tokens），大 context + 慢模型 = 超时。haiku 推理速度快，能在超时前完成。
+
+**状态**: ❌ 未修复，需 OpenClaw 上游修复 core bug
+
+### LCM 健康检查（Apr 3 05:55 UTC）
+
+| 项目 | 状态 | 详情 |
+|------|------|------|
+| 插件加载 | ✅ | enabled=true, haiku-4-5 override 生效 |
+| Compaction | ✅ | 24h 内生成 462 条 summaries |
+| 认证 | ✅ | 当前进程无 auth 错误 |
+| DB 体积 | ⚠️ | 596 MB（偏大，建议 VACUUM）|
+
+**各 Agent 空消息比例**:
+
+| Agent | 总消息 | 空消息 | 比例 | Summary |
+|-------|--------|--------|------|---------|
+| main | 12,353 | 2,797 | 22.6% | 321 |
+| cbz001 | 2,975 | 554 | 18.6% | 779 |
+| clawdoctor | 2,113 | 461 | 21.8% | 66 |
+| wairesearch | 1,904 | 552 | 29.0% | 63 |
+| ruankao | 2,049 | 115 | 5.6% | 11 |
+| waicode | 47 | 11 | 23.4% | 0 |
+
+### DB 清理执行
+
+```sql
+-- 清理纯垃圾空消息（无 message_parts）
+DELETE FROM messages 
+WHERE role='assistant' AND length(content)=0 
+AND message_id NOT IN (
+  SELECT DISTINCT message_id FROM message_parts WHERE message_id IS NOT NULL
+);
+-- 结果: 55 条删除
+```
+
+保留了 5,436 条 tool-only 消息（有 parts 但 content=""），原因：
+- 删除会破坏 tool_use/tool_result 配对
+- summary 引用链可能断裂
+- assembler filter 已兜底，不影响功能
+- 等上游修复 contentFromParts() 后这些数据可恢复
+
+### 各 Agent 最终状态
+
+| Agent | 状态 | 恢复方式 |
+|-------|------|----------|
+| main | ✅ | assembler filter 自动修复 |
+| clawdoctor | ✅ | assembler filter 自动修复 |
+| wairesearch | ✅ | `/new` 新会话 |
+| waicode | ✅ | `/new` 新会话 |
+| cbz001 | ✅ | 正常（12h 无活动）|
+| ruankao | ✅ | 正常 |
+
+---
+
+## 待办
+
+- [ ] 提 OpenClaw GitHub issue 报告 `.replace()` core bug
+- [ ] 观察 assembler filter 24-48h 确认无回归
+- [ ] 执行 `sqlite3 ~/.openclaw/lcm.db "VACUUM;"` 缩减 DB 体积
+- [ ] 清理 assembler.ts 中的 debug logging（观察期结束后）
+- [ ] 跟进 PR #248 合并状态
+
+---
+
+**记录时间**: 2026-04-03 06:34 UTC（更新）  
 **记录者**: ClawDoctor  
-**标签**: `lossless-claw` `assembler` `anthropic-api` `empty-content` `根因分析` `已解决`
+**标签**: `lossless-claw` `assembler` `anthropic-api` `empty-content` `openclaw-core` `failover` `根因分析` `已解决`
